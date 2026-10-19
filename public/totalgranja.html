@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Total Inventario por Granjas</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { background-color: #f4f6f9; color: #333; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 25px; }
+
+        .nav-links { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; }
+        .nav-links a { background: #34495e; color: white; padding: 8px 15px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .nav-links a:hover { background: #2c3e50; }
+
+        /* Tarjeta de Resumen General */
+        .card-global { background: #eef2f5; border: 1px solid #dcdde1; padding: 20px; border-radius: 6px; text-align: center; margin-bottom: 25px; }
+        .card-global h3 { font-size: 12px; color: #7f8c8d; text-transform: uppercase; margin-bottom: 8px; }
+        .card-global p { font-size: 24px; font-weight: bold; color: #2c3e50; }
+
+        /* Tabla */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; }
+        th, td { padding: 12px 15px; border-bottom: 1px solid #e1e8ed; font-size: 14px; }
+        th { background: #2c3e50; color: white; }
+        tr:hover { background: #f8f9fa; }
+
+        .text-total { color: #27ae60; font-weight: bold; font-size: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="nav-links">
+            <a href="index.html">Panel Principal</a>
+            <a href="reporte.html">Reporte General</a>
+            <a href="admin.html">Administración</a>
+        </div>
+
+        <h1>Total Consolidado por Granja 📊</h1>
+
+        <!-- Tarjeta del Total General Global -->
+        <div class="card-global">
+            <h3>Gran Total General de Inventario</h3>
+            <p id="totalGeneralCard">0</p>
+        </div>
+
+        <!-- Tabla Simplificada -->
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Granja</th>
+                        <th>Cantidad Total</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaTotalGranjaBody">
+                    <!-- Los datos se cargan dinámicamente -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const granjasIdMap = {
+            'borinquen': 20, 'caguan': 21, 'conquista': 24, 'guatavita': 30, 'laguna': 38,
+            'lomas': 39, 'muisca': 42, 'praga': 44, 'san diego': 46, 'san felipe': 47,
+            'santa isabel': 50, 'santa maria': 51, 'santa sofia': 52, 'tres esquinas': 54,
+            'paraiso': 59, 'canelos': 66, 'pradera': 1220, 'villa luz la laja': 1221,
+            'garvanzal': 1224, 'progreso': 1264, 'caracoli': 1281, 'sauce': 1289,
+            'san francisco': 1290, 'fortaleza': 1291, 'san rafael': 1306, 'buena vista': 1312,
+            'pedrera': 1313, 'primavera 2': 1324, 'delicias 2': 1326, 'aire libre': 1327,
+            'esperanza': 1331, 'villa inés': 1336, 'esmeralda': 1352, 'milagrosa': 1356,
+            'diviso': 1367, 'morelia': 1377, 'fortuna': 1379, 'prado': 1380, 'pomarroso': 1387,
+            'morro': 1391, 'victoria': 1398, 'olivos': 1399, 'llano de palma': 1401,
+            'andalucia': 1408, 'san gabriel': 1409, 'roble': 1421, 'caimito': 1438,
+            'san fernando': 1440, 'prosperidad': 1443, 'perpetua': 1445, 'marías': 1446,
+            'san carlos': 1448
+        };
+
+        function limpiarNombreGranja(nombre) {
+            if (!nombre) return '';
+            let limpio = nombre.includes(' - ') ? nombre.split(' - ')[1].trim() : nombre.trim();
+            limpio = limpio.replace(/\s+MOD\s*\d+/i, '').trim();
+            return limpio;
+        }
+
+        function obtenerIdGranja(nombreGranja, idOriginal) {
+            const nombreLimpio = limpiarNombreGranja(nombreGranja).toLowerCase();
+            if (granjasIdMap[nombreLimpio]) {
+                return granjasIdMap[nombreLimpio];
+            }
+            if (idOriginal && idOriginal !== 0 && idOriginal !== 108) {
+                return Number(idOriginal);
+            }
+            return idOriginal || 'N/A';
+        }
+
+        async function cargarTotalGranja() {
+            try {
+                const [resIngresos, resLavar, resRecuperados] = await Promise.all([
+                    fetch('/api/ingresos'),
+                    fetch('/api/huevos-a-lavar'),
+                    fetch('/api/huevos-recuperados')
+                ]);
+
+                const dataIngresos = await resIngresos.json();
+                const dataLavar = await resLavar.json();
+                const dataRecuperados = await resRecuperados.json();
+
+                const tbody = document.getElementById('tablaTotalGranjaBody');
+                tbody.innerHTML = '';
+
+                const mapaRegistros = {};
+
+                // 1. Procesar ingresos
+                if (Array.isArray(dataIngresos)) {
+                    dataIngresos.forEach(reg => {
+                        const nombreLimpio = limpiarNombreGranja(reg.granja);
+                        const idGranja = obtenerIdGranja(reg.granja, reg.id);
+                        const clave = nombreLimpio.toLowerCase();
+                        
+                        const sumaFila = (Number(reg.cantidad_util) || 0) + 
+                                         (Number(reg.bases_sucias) || 0) + 
+                                         (Number(reg.siniestros) || 0);
+
+                        if (mapaRegistros[clave]) {
+                            mapaRegistros[clave].total += sumaFila;
+                            if (!mapaRegistros[clave].idGranjaCalculado || mapaRegistros[clave].idGranjaCalculado === 'N/A' || mapaRegistros[clave].idGranjaCalculado === 108) {
+                                mapaRegistros[clave].idGranjaCalculado = idGranja;
+                            }
+                        } else {
+                            mapaRegistros[clave] = {
+                                granja: reg.granja,
+                                idGranjaCalculado: idGranja,
+                                total: sumaFila
+                            };
+                        }
+                    });
+                }
+
+                // 2. Procesar lavados
+                if (Array.isArray(dataLavar)) {
+                    dataLavar.forEach(rec => {
+                        const nombreLimpio = limpiarNombreGranja(rec.granja);
+                        const idGranja = obtenerIdGranja(rec.granja, rec.id);
+                        const clave = nombreLimpio.toLowerCase();
+                        const valorLavar = Number(rec.cantidad_lavada || 0);
+
+                        if (mapaRegistros[clave]) {
+                            mapaRegistros[clave].total += valorLavar;
+                            if (!mapaRegistros[clave].idGranjaCalculado || mapaRegistros[clave].idGranjaCalculado === 'N/A' || mapaRegistros[clave].idGranjaCalculado === 108) {
+                                mapaRegistros[clave].idGranjaCalculado = idGranja;
+                            }
+                        } else {
+                            mapaRegistros[clave] = {
+                                granja: rec.granja,
+                                idGranjaCalculado: idGranja,
+                                total: valorLavar
+                            };
+                        }
+                    });
+                }
+
+                // 3. Procesar recuperados
+                if (Array.isArray(dataRecuperados)) {
+                    dataRecuperados.forEach(rec => {
+                        const nombreLimpio = limpiarNombreGranja(rec.granja);
+                        const idGranja = obtenerIdGranja(rec.granja, rec.id);
+                        const clave = nombreLimpio.toLowerCase();
+                        const valorRecup = Number(rec.cantidad_recuperada || rec.cantidad || 0);
+
+                        if (mapaRegistros[clave]) {
+                            mapaRegistros[clave].total += valorRecup;
+                            if (!mapaRegistros[clave].idGranjaCalculado || mapaRegistros[clave].idGranjaCalculado === 'N/A' || mapaRegistros[clave].idGranjaCalculado === 108) {
+                                mapaRegistros[clave].idGranjaCalculado = idGranja;
+                            }
+                        } else {
+                            mapaRegistros[clave] = {
+                                granja: rec.granja,
+                                idGranjaCalculado: idGranja,
+                                total: valorRecup
+                            };
+                        }
+                    });
+                }
+
+                const listaFinal = Object.values(mapaRegistros).filter(item => item.total > 0.05);
+
+                if (listaFinal.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #777;">No hay registros disponibles.</td></tr>`;
+                    return;
+                }
+
+                // Ordenar por ID de granja de menor a mayor
+                listaFinal.sort((a, b) => {
+                    const idA = !isNaN(Number(a.idGranjaCalculado)) ? Number(a.idGranjaCalculado) : 999999;
+                    const idB = !isNaN(Number(b.idGranjaCalculado)) ? Number(b.idGranjaCalculado) : 999999;
+                    return idA - idB;
+                });
+
+                let granTotal = 0;
+
+                listaFinal.forEach((reg) => {
+                    const nombreGranja = limpiarNombreGranja(reg.granja) || 'Desconocida';
+                    const idMostrado = (reg.idGranjaCalculado && reg.idGranjaCalculado !== 'N/A') ? reg.idGranjaCalculado : obtenerIdGranja(nombreGranja, '-');
+                    
+                    granTotal += reg.total;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><b>${idMostrado}</b></td>
+                        <td>${nombreGranja}</td>
+                        <td class="text-total">${reg.total.toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                // Mostrar el total general acumulado
+                document.getElementById('totalGeneralCard').textContent = granTotal.toLocaleString();
+
+            } catch (err) {
+                console.error("Error al cargar el consolidado por granja:", err);
+            }
+        }
+
+        cargarTotalGranja();
+    </script>
+</body>
+</html>
