@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNC - Control de Huevo Recuperado y Sucio a Lavar</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { background-color: #f4f6f9; color: #333; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
+
+        .nav-links { display: flex; justify-content: center; margin-bottom: 25px; }
+        .nav-links a { background: #2980b9; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .nav-links a:hover { background: #1f618d; }
+
+        .accordion-item { border: 1px solid #ddd; border-radius: 6px; margin-bottom: 15px; overflow: hidden; background: #fff; }
+        .accordion-header { background: #ecf0f1; color: #2c3e50; padding: 15px; font-size: 15px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; transition: background 0.3s; }
+        .accordion-header:hover { background: #dcdde1; }
+        .accordion-header::after { content: '+'; font-size: 18px; font-weight: bold; }
+        .accordion-item.active .accordion-header::after { content: '-'; }
+        
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #f9f9f9; padding: 0 20px; }
+        .accordion-item.active .accordion-content { max-height: 1000px; padding: 20px; border-top: 1px solid #ddd; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { margin-bottom: 5px; font-size: 13px; font-weight: bold; }
+        input, select { padding: 9px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background: #fff; }
+
+        button { background: #2980b9; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; width: 100%; }
+        button:hover { background: #2471a3; }
+        .btn-sucio { background: #8e44ad; }
+        .btn-sucio:hover { background: #732d91; }
+
+        .mensaje { margin-top: 15px; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; display: none; }
+        .mensaje.success { background: #d4edda; color: #155724; display: block; }
+        .mensaje.error { background: #f8d7da; color: #721c24; display: block; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="nav-links">
+            <a href="reporte.html">Reporte General</a>
+        </div>
+
+        <h1>PNC - Control de Recuperado y Lavado</h1>
+        
+        <!-- ACORDEÓN 1: DESCONTAR HUEVO RECUPERADO -->
+        <div class="accordion-item active" id="accordionDescontarRecup">
+            <div class="accordion-header" onclick="toggleAccordion('accordionDescontarRecup')">Descontar Huevo Recuperado</div>
+            <div class="accordion-content">
+                <form id="formDescontarRecup">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="granjaDescuentoRecup">Granja:</label>
+                            <select id="granjaDescuentoRecup" required onchange="cargarLotesRecuperados()">
+                                <option value="">Seleccione una granja...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="fechaRecuperadoSelect">Lote / Fecha de Huevo Recuperado:</label>
+                            <select id="fechaRecuperadoSelect" required>
+                                <option value="">Seleccione lote o fecha...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="valorRecuperadoDescuento">Cantidad a Descontar:</label>
+                        <input type="number" id="valorRecuperadoDescuento" min="1" step="1" placeholder="Ej: 100" required onwheel="this.blur()">
+                    </div>
+
+                    <button type="submit">Procesar Descuento de Huevo Recuperado</button>
+                    <div id="mensajeDescuentoRecup" class="mensaje"></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- ACORDEÓN 2: GESTIÓN DE SUCIO A LAVAR -->
+        <div class="accordion-item" id="accordionSucioLavar">
+            <div class="accordion-header" onclick="toggleAccordion('accordionSucioLavar')">Gestión de Sucio a Lavar (Ingreso / Descuento)</div>
+            <div class="accordion-content">
+                <form id="formSucioLavar">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="granjaSucio">Granja:</label>
+                            <select id="granjaSucio" required onchange="cargarLotesSucioLavar()">
+                                <option value="">Seleccione una granja...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="tipoAccionSucio">Acción a Realizar:</label>
+                            <select id="tipoAccionSucio" required onchange="cambiarAccionSucio()">
+                                <option value="">Seleccione acción...</option>
+                                <option value="ingresar">Registrar Nuevo Ingreso de Sucio</option>
+                                <option value="descontar">Descontar Lote Existente (Lavado)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="contenedorFechaSucio" style="display: none;" class="form-grid">
+                        <div class="form-group" id="grupoFechaIngresoSucio">
+                            <label for="fechaIngresoSucio">Fecha de Ingreso:</label>
+                            <input type="date" id="fechaIngresoSucio" onwheel="this.blur()">
+                        </div>
+                        <div class="form-group" id="grupoFechaLoteSucio" style="display: none;">
+                            <label for="fechaLoteSucioSelect">Seleccionar Lote / Fecha a Descontar:</label>
+                            <select id="fechaLoteSucioSelect">
+                                <option value="">Seleccione lote...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cantidadSucioAccion">Cantidad:</label>
+                            <input type="number" id="cantidadSucioAccion" min="1" step="1" placeholder="Ej: 200" onwheel="this.blur()">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-sucio" id="btnAccionSucio" style="display: none; margin-top: 15px;">Guardar Acción</button>
+                    <div id="mensajeSucioLavar" class="mensaje"></div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const granjasData = [
+            { id: 20, name: 'Borinquen' }, { id: 21, name: 'Caguan' }, { id: 24, name: 'Conquista' },
+            { id: 30, name: 'Guatavita' }, { id: 38, name: 'Laguna' }, { id: 39, name: 'Lomas' },
+            { id: 42, name: 'Muisca' }, { id: 44, name: 'Praga' }, { id: 46, name: 'San Diego' },
+            { id: 47, name: 'San Felipe' }, { id: 50, name: 'Santa Isabel' }, { id: 51, name: 'Santa Maria' },
+            { id: 52, name: 'Santa Sofia' }, { id: 54, name: 'Tres Esquinas' }, { id: 59, name: 'Paraiso' },
+            { id: 66, name: 'Canelos' }, { id: 1220, name: 'Pradera' }, { id: 1221, name: 'Villa Luz La Laja' },
+            { id: 1224, name: 'Garvanzal' }, { id: 1264, name: 'Progreso' }, { id: 1281, name: 'Caracoli' },
+            { id: 1289, name: 'Sauce' }, { id: 1290, name: 'San Francisco' }, { id: 1291, name: 'Fortaleza' },
+            { id: 1306, name: 'San Rafael' }, { id: 1312, name: 'Buena Vista' }, { id: 1313, name: 'Pedrera' },
+            { id: 1324, name: 'Primavera 2' }, { id: 1326, name: 'Delicias 2' }, { id: 1327, name: 'Aire Libre' },
+            { id: 1331, name: 'Esperanza' }, { id: 1336, name: 'Villa Inés' }, { id: 1352, name: 'Esmeralda' },
+            { id: 1356, name: 'Milagrosa' }, { id: 1367, name: 'Diviso' }, { id: 1377, name: 'Morelia' },
+            { id: 1379, name: 'Fortuna' }, { id: 1380, name: 'Prado' }, { id: 1387, name: 'Pomarroso' },
+            { id: 1391, name: 'Morro' }, { id: 1398, name: 'Victoria' }, { id: 1399, name: 'Olivos' },
+            { id: 1401, name: 'Llano de Palma' }, { id: 1408, name: 'Andalucia' }, { id: 1409, name: 'San Gabriel' },
+            { id: 1421, name: 'ROBLE' }, { id: '1421-1', name: 'Roble MOD1' }, { id: '1421-2', name: 'Roble MOD2' },
+            { id: '1421-3', name: 'Roble MOD3' }, { id: '1421-4', name: 'Roble MOD4' }, { id: '1421-5', name: 'Roble MOD5' },
+            { id: '1421-6', name: 'Roble MOD6' }, { id: '1421-7', name: 'Roble MOD7' }, { id: '1421-8', name: 'Roble MOD8' },
+            { id: '1421-9', name: 'Roble MOD9' }, { id: 1438, name: 'Caimito' }, { id: 1440, name: 'San Fernando' },
+            { id: 1443, name: 'Prosperidad' }, { id: 1445, name: 'Perpetua' }, { id: 1446, name: 'Marías' },
+            { id: 1448, name: 'San Carlos' }
+        ];
+
+        const selectDescuentoRecup = document.getElementById('granjaDescuentoRecup');
+        const selectSucio = document.getElementById('granjaSucio');
+
+        granjasData.sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, {numeric: true})).forEach(g => {
+            const optText = `ID ${g.id} - ${g.name}`;
+            [selectDescuentoRecup, selectSucio].forEach(sel => {
+                const opt = document.createElement('option');
+                opt.value = g.name;
+                opt.textContent = optText;
+                sel.appendChild(opt);
+            });
+        });
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const fIngresoSucio = document.getElementById('fechaIngresoSucio');
+        if (fIngresoSucio) {
+            fIngresoSucio.valueAsDate = new Date();
+            fIngresoSucio.max = todayStr;
+        }
+
+        function toggleAccordion(id) {
+            const item = document.getElementById(id);
+            const wasActive = item.classList.contains('active');
+            document.querySelectorAll('.accordion-item').forEach(el => el.classList.remove('active'));
+            if (!wasActive) item.classList.add('active');
+        }
+
+        async function cargarLotesRecuperados() {
+            const granja = selectDescuentoRecup.value;
+            const selectRecup = document.getElementById('fechaRecuperadoSelect');
+            selectRecup.innerHTML = '<option value="">Seleccione lote o fecha...</option>';
+            if (!granja) return;
+
+            const nombreLimpio = granja.includes(' - ') ? granja.split(' - ')[1].trim() : granja;
+
+            try {
+                const res = await fetch('/api/huevos-recuperados');
+                const data = await res.json();
+                
+                const recuperadosGranja = Array.isArray(data) ? data.filter(item => {
+                    if (!item.granja) return false;
+                    const gLimpia = item.granja.includes(' - ') ? item.granja.split(' - ')[1].trim() : item.granja;
+                    return gLimpia.toLowerCase() === nombreLimpio.toLowerCase();
+                }) : [];
+
+                const fechasAgrupadas = {};
+                recuperadosGranja.forEach(item => {
+                    const fecha = item.fecha;
+                    if (!fechasAgrupadas[fecha]) fechasAgrupadas[fecha] = 0;
+                    fechasAgrupadas[fecha] += Number(item.cantidad_recuperada) || 0;
+                });
+
+                Object.keys(fechasAgrupadas).forEach(fecha => {
+                    const saldo = fechasAgrupadas[fecha];
+                    if (saldo > 0) {
+                        const opt = document.createElement('option');
+                        opt.value = fecha;
+                        opt.textContent = `Fecha: ${fecha} (Disponible: ${saldo})`;
+                        selectRecup.appendChild(opt);
+                    }
+                });
+            } catch (err) {
+                console.error("Error al cargar lotes recuperados:", err);
+            }
+        }
+
+        async function cargarLotesSucioLavar() {
+            const granja = selectSucio.value;
+            const selectLoteSucio = document.getElementById('fechaLoteSucioSelect');
+            selectLoteSucio.innerHTML = '<option value="">Seleccione lote...</option>';
+            if (!granja) return;
+
+            const nombreLimpio = granja.includes(' - ') ? granja.split(' - ')[1].trim() : granja;
+
+            try {
+                const res = await fetch('/api/huevos-a-lavar');
+                const data = await res.json();
+                
+                const cacheLavarGranja = Array.isArray(data) ? data.filter(item => {
+                    if (!item.granja) return false;
+                    const itemGranjaLimpia = item.granja.includes(' - ') ? item.granja.split(' - ')[1].trim() : item.granja;
+                    return itemGranjaLimpia.toLowerCase() === nombreLimpio.toLowerCase();
+                }) : [];
+
+                const fechasAgrupadas = {};
+                cacheLavarGranja.forEach(item => {
+                    const fecha = item.fecha;
+                    if (!fechasAgrupadas[fecha]) fechasAgrupadas[fecha] = 0;
+                    fechasAgrupadas[fecha] += Number(item.cantidad_lavada) || 0;
+                });
+
+                Object.keys(fechasAgrupadas).forEach(fecha => {
+                    const cant = fechasAgrupadas[fecha];
+                    if (cant <= 0) return;
+                    const opt = document.createElement('option');
+                    opt.value = fecha;
+                    opt.textContent = `Fecha: ${fecha} (Disponible para lavar: ${cant})`;
+                    selectLoteSucio.appendChild(opt);
+                });
+            } catch (err) {
+                console.error("Error al cargar lotes de sucio a lavar:", err);
+            }
+        }
+
+        function cambiarAccionSucio() {
+            const accion = document.getElementById('tipoAccionSucio').value;
+            const contenedor = document.getElementById('contenedorFechaSucio');
+            const grupoIngreso = document.getElementById('grupoFechaIngresoSucio');
+            const grupoLote = document.getElementById('grupoFechaLoteSucio');
+            const btn = document.getElementById('btnAccionSucio');
+
+            if (!accion) {
+                contenedor.style.display = 'none';
+                btn.style.display = 'none';
+                return;
+            }
+
+            contenedor.style.display = 'grid';
+            btn.style.display = 'block';
+
+            if (accion === 'ingresar') {
+                grupoIngreso.style.display = 'flex';
+                grupoLote.style.display = 'none';
+                btn.textContent = 'Guardar Ingreso de Sucio';
+            } else {
+                grupoIngreso.style.display = 'none';
+                grupoLote.style.display = 'flex';
+                btn.textContent = 'Procesar Descuento de Lavado';
+            }
+        }
+
+        // 1. Envío de Descuento de Huevo Recuperado dirigido a la ruta correcta del servidor (/api/salidas)[cite: 2]
+        document.getElementById('formDescontarRecup').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById('mensajeDescuentoRecup');
+            const granja = selectDescuentoRecup.value;
+            const fechaRecup = document.getElementById('fechaRecuperadoSelect').value;
+            const valorRecup = parseInt(document.getElementById('valorRecuperadoDescuento').value) || 0;
+
+            if (!fechaRecup) {
+                msg.textContent = 'Por favor seleccione el lote a descontar.';
+                msg.className = 'mensaje error';
+                msg.style.display = 'block';
+                return;
+            }
+
+            // Estructura exacta que espera app.post('/api/salidas') en server.js[cite: 2]
+            const payload = {
+                tipo: 'revoltura',
+                granja: granja,
+                fechaBases: fechaRecup,         // Fecha del lote recuperado a descontar
+                cantidad: 0,                   // 0 para no tocar revoltura útil
+                fechaRecuperado: fechaRecup,   // Fecha que lee el servidor para buscar en huevos_recuperados
+                valorRecuperado: valorRecup    // Cantidad a restar
+            };
+
+            try {
+                const res = await fetch('/api/salidas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    msg.textContent = '¡Huevo recuperado descontado con éxito!';
+                    msg.className = 'mensaje success';
+                    msg.style.display = 'block';
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    msg.textContent = 'Error: ' + (data.error || 'No se pudo procesar el descuento.');
+                    msg.className = 'mensaje error';
+                    msg.style.display = 'block';
+                }
+            } catch (err) {
+                msg.textContent = 'Error de conexión con el servidor.';
+                msg.className = 'mensaje error';
+                msg.style.display = 'block';
+            }
+        });
+
+        // 2. Gestión de Sucio a Lavar (Usa correctamente /api/salidas-recuperado para la tabla huevos_a_lavar)[cite: 2]
+        document.getElementById('formSucioLavar').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById('mensajeSucioLavar');
+            const granja = selectSucio.value;
+            const accion = document.getElementById('tipoAccionSucio').value;
+            const cantidad = parseInt(document.getElementById('cantidadSucioAccion').value) || 0;
+
+            if (accion === 'ingresar') {
+                const fecha = fIngresoSucio.value;
+                try {
+                    const res = await fetch('/api/huevos-a-lavar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fecha, granja, cantidad_lavada: cantidad })
+                    });
+
+                    if (res.ok) {
+                        msg.textContent = '¡Sucio a lavar registrado con éxito!';
+                        msg.className = 'mensaje success';
+                        msg.style.display = 'block';
+                        setTimeout(() => location.reload(), 1200);
+                    } else {
+                        const data = await res.json();
+                        msg.textContent = 'Error: ' + (data.error || 'No se pudo registrar.');
+                        msg.className = 'mensaje error';
+                        msg.style.display = 'block';
+                    }
+                } catch (err) {
+                    msg.textContent = 'Error de conexión con el servidor.';
+                    msg.className = 'mensaje error';
+                    msg.style.display = 'block';
+                }
+            } else {
+                const fechaLote = document.getElementById('fechaLoteSucioSelect').value;
+                if (!fechaLote) {
+                    msg.textContent = 'Por favor seleccione el lote a descontar.';
+                    msg.className = 'mensaje error';
+                    msg.style.display = 'block';
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/api/salidas-recuperado', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            modo: 'descontar',
+                            granja: granja,
+                            fechaBases: fechaLote,
+                            valor: cantidad
+                        })
+                    });
+
+                    if (res.ok) {
+                        msg.textContent = '¡Descuento de lavado procesado correctamente!';
+                        msg.className = 'mensaje success';
+                        msg.style.display = 'block';
+                        setTimeout(() => location.reload(), 1200);
+                    } else {
+                        const data = await res.json();
+                        msg.textContent = 'Error: ' + (data.error || 'No se pudo procesar.');
+                        msg.className = 'mensaje error';
+                        msg.style.display = 'block';
+                    }
+                } catch (err) {
+                    msg.textContent = 'Error de conexión con el servidor.';
+                    msg.className = 'mensaje error';
+                    msg.style.display = 'block';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte General - Inventario por Granjas</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { background-color: #f4f6f9; color: #333; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 25px; }
+
+        .nav-links { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; }
+        .nav-links a { background: #34495e; color: white; padding: 8px 15px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .nav-links a:hover { background: #2c3e50; }
+
+        /* Tarjetas de Resumen */
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .card { background: #fff; border: 1px solid #e1e8ed; padding: 20px; border-radius: 6px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        .card h3 { font-size: 11px; color: #7f8c8d; text-transform: uppercase; margin-bottom: 8px; }
+        .card p { font-size: 20px; font-weight: bold; color: #27ae60; }
+        .card.bases p { color: #d35400; }
+        .card.lavar p { color: #8e44ad; }
+        .card.recuperado p { color: #2980b9; }
+
+        /* Controles de Filtro */
+        .filter-container { display: grid; grid-template-columns: 2fr 1fr auto; gap: 15px; margin-bottom: 20px; background: #ecf0f1; padding: 15px; border-radius: 6px; align-items: end; }
+        .filter-group { display: flex; flex-direction: column; }
+        label { margin-bottom: 5px; font-size: 12px; font-weight: bold; color: #2c3e50; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background: #fff; }
+        
+        .btn-export { background: #2980b9; color: white; border: none; padding: 9px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; height: 38px; }
+        .btn-export:hover { background: #2471a3; }
+
+        /* Tabla */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; }
+        th, td { padding: 12px 15px; border-bottom: 1px solid #e1e8ed; font-size: 14px; }
+        th { background: #2c3e50; color: white; }
+        tr:hover { background: #f8f9fa; }
+
+        .text-util { color: #27ae60; font-weight: bold; }
+        .text-bases { color: #d35400; font-weight: bold; }
+        .text-lavar { color: #8e44ad; font-weight: bold; }
+        .text-recuperado { color: #2980b9; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="nav-links">
+            <a href="revoltura.html">Revoltura</a>
+            <a href="cargador.html">Cargador</a>
+            <a href="pnc.html">PNC</a>
+        </div>
+
+        <h1>Inventario por Granjas</h1>
+
+        <!-- Tarjetas de Totales (Sin Siniestros) -->
+        <div class="cards-grid">
+            <div class="card">
+                <h3>Total Revoltura</h3>
+                <p id="totalUtilCard">0</p>
+            </div>
+            <div class="card bases">
+                <h3>Total Bases Sucias</h3>
+                <p id="totalBasesCard">0</p>
+            </div>
+            <div class="card lavar">
+                <h3>Total Sucio a Lavar</h3>
+                <p id="totalLavarCard">0</p>
+            </div>
+            <div class="card recuperado">
+                <h3>Total Huevo Recuperado</h3>
+                <p id="totalRecuperadoCard">0</p>
+            </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filter-container">
+            <div class="filter-group">
+                <label for="buscarGranja">Buscar por Granja o ID:</label>
+                <input type="text" id="buscarGranja" placeholder="Ej. Borinquen o 20..." oninput="filtrarTabla()">
+            </div>
+            <div class="filter-group">
+                <label for="filtrarFecha">Filtrar por Fecha:</label>
+                <input type="date" id="filtrarFecha" onchange="filtrarTabla()">
+            </div>
+            <div>
+                <button class="btn-export" onclick="exportarCSV()">Exportar CSV</button>
+            </div>
+        </div>
+
+        <!-- Tabla de Datos -->
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>ID</th>
+                        <th>Granja</th>
+                        <th>Revoltura</th>
+                        <th>Bases Sucias</th>
+                        <th>Huevo Recuperado</th>
+                        <th>Sucio a Lavar</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaReporteBody">
+                    <!-- Los datos se cargan dinámicamente -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let datosGlobales = [];
+
+        const granjasIdMap = {
+            'Borinquen': 20, 'Caguan': 21, 'Conquista': 24, 'Guatavita': 30, 'Laguna': 38,
+            'Lomas': 39, 'Muisca': 42, 'Praga': 44, 'San Diego': 46, 'San Felipe': 47,
+            'Santa Isabel': 50, 'Santa Maria': 51, 'Santa Sofia': 52, 'Tres Esquinas': 54,
+            'Paraiso': 59, 'Canelos': 66, 'Pradera': 1220, 'Villa Luz La Laja': 1221,
+            'Garvanzal': 1224, 'Progreso': 1264, 'Caracoli': 1281, 'Sauce': 1289,
+            'San Francisco': 1290, 'Fortaleza': 1291, 'San Rafael': 1306, 'Buena Vista': 1312,
+            'Pedrera': 1313, 'Primavera 2': 1324, 'Delicias 2': 1326, 'Aire Libre': 1327,
+            'Esperanza': 1331, 'Villa Inés': 1336, 'Esmeralda': 1352, 'Milagrosa': 1356,
+            'Diviso': 1367, 'Morelia': 1377, 'Fortuna': 1379, 'Prado': 1380, 'Pomarroso': 1387,
+            'Morro': 1391, 'Victoria': 1398, 'Olivos': 1399, 'Llano de Palma': 1401,
+            'Andalucia': 1408, 'San Gabriel': 1409, 'Roble': 1421, 'Caimito': 1438,
+            'San Fernando': 1440, 'Prosperidad': 1443, 'Perpetua': 1445, 'Marías': 1446,
+            'San Carlos': 1448
+        };
+
+        function limpiarNombreGranja(nombre) {
+            if (!nombre) return '';
+            let limpio = nombre.includes(' - ') ? nombre.split(' - ')[1].trim() : nombre.trim();
+            // Eliminar sufijos de módulos como "MOD1", "MOD 1", etc. para que coincida con el diccionario
+            limpio = limpio.replace(/\s+MOD\s*\d+/i, '').trim();
+            return limpio;
+        }
+
+        function obtenerIdGranja(item) {
+            const nombreLimpio = limpiarNombreGranja(item.granja);
+            if (granjasIdMap[nombreLimpio]) {
+                return granjasIdMap[nombreLimpio];
+            }
+            if (item.id && item.id !== 0) {
+                return Number(item.id);
+            }
+            return 0;
+        }
+
+        async function cargarReporte() {
+            try {
+                const [resIngresos, resLavar, resRecuperados] = await Promise.all([
+                    fetch('/api/ingresos'),
+                    fetch('/api/huevos-a-lavar'),
+                    fetch('/api/huevos-recuperados')
+                ]);
+
+                const dataIngresos = await resIngresos.json();
+                const dataLavar = await resLavar.json();
+                const dataRecuperados = await resRecuperados.json();
+
+                const mapaUnificado = {};
+
+                // 1. Procesar ingresos de revoltura
+                if (Array.isArray(dataIngresos)) {
+                    dataIngresos.forEach(item => {
+                        const nombreLimpio = limpiarNombreGranja(item.granja);
+                        const idGranja = obtenerIdGranja(item);
+                        const fecha = item.fecha || '';
+                        const clave = `${fecha}_${nombreLimpio.toLowerCase()}`;
+                        
+                        if (mapaUnificado[clave]) {
+                            mapaUnificado[clave].cantidad_util += Number(item.cantidad_util || 0);
+                            mapaUnificado[clave].bases_sucias += Number(item.bases_sucias || 0);
+                            if (!mapaUnificado[clave].id || mapaUnificado[clave].id === 0 || mapaUnificado[clave].id === 108) {
+                                mapaUnificado[clave].id = Number(idGranja) || 0;
+                            }
+                        } else {
+                            mapaUnificado[clave] = {
+                                fecha: fecha,
+                                granja: item.granja || '',
+                                id: Number(idGranja) || 0,
+                                cantidad_util: Number(item.cantidad_util || 0),
+                                bases_sucias: Number(item.bases_sucias || 0),
+                                sucio_a_lavar: 0,
+                                huevo_recuperado: 0
+                            };
+                        }
+                    });
+                }
+
+                // 2. Procesar datos de Sucio a Lavar
+                if (Array.isArray(dataLavar)) {
+                    dataLavar.forEach(rec => {
+                        const nombreLimpio = limpiarNombreGranja(rec.granja);
+                        const idGranja = obtenerIdGranja(rec);
+                        const fecha = rec.fecha || '';
+                        const clave = `${fecha}_${nombreLimpio.toLowerCase()}`;
+                        const valorLavar = Number(rec.cantidad_lavada || 0);
+
+                        if (mapaUnificado[clave]) {
+                            mapaUnificado[clave].sucio_a_lavar += valorLavar;
+                            if (!mapaUnificado[clave].id || mapaUnificado[clave].id === 0 || mapaUnificado[clave].id === 108) {
+                                mapaUnificado[clave].id = Number(idGranja) || 0;
+                            }
+                        } else {
+                            mapaUnificado[clave] = {
+                                fecha: fecha,
+                                granja: rec.granja || '',
+                                id: Number(idGranja) || 0,
+                                cantidad_util: 0,
+                                bases_sucias: 0,
+                                sucio_a_lavar: valorLavar,
+                                huevo_recuperado: 0
+                            };
+                        }
+                    });
+                }
+
+                // 3. Procesar datos de Huevo Recuperado
+                if (Array.isArray(dataRecuperados)) {
+                    dataRecuperados.forEach(rec => {
+                        const nombreLimpio = limpiarNombreGranja(rec.granja);
+                        const idGranja = obtenerIdGranja(rec);
+                        const fecha = rec.fecha || '';
+                        const clave = `${fecha}_${nombreLimpio.toLowerCase()}`;
+                        const valorRecup = Number(rec.cantidad_recuperada || rec.cantidad || 0);
+
+                        if (mapaUnificado[clave]) {
+                            mapaUnificado[clave].huevo_recuperado += valorRecup;
+                            if (!mapaUnificado[clave].id || mapaUnificado[clave].id === 0 || mapaUnificado[clave].id === 108) {
+                                mapaUnificado[clave].id = Number(idGranja) || 0;
+                            }
+                        } else {
+                            mapaUnificado[clave] = {
+                                fecha: fecha,
+                                granja: rec.granja || '',
+                                id: Number(idGranja) || 0,
+                                cantidad_util: 0,
+                                bases_sucias: 0,
+                                sucio_a_lavar: 0,
+                                huevo_recuperado: valorRecup
+                            };
+                        }
+                    });
+                }
+
+                datosGlobales = Object.values(mapaUnificado).filter(item => {
+                    return !(item.cantidad_util <= 0.05 && item.bases_sucias <= 0.05 && item.sucio_a_lavar <= 0.05 && item.huevo_recuperado <= 0.05);
+                });
+
+                // Ordenar de menor a mayor por ID de la granja
+                datosGlobales.sort((a, b) => {
+                    const idA = Number(a.id) || 0;
+                    const idB = Number(b.id) || 0;
+                    if (idA !== idB) {
+                        return idA - idB; // Menor a mayor ID
+                    }
+                    return (a.fecha || '').localeCompare(b.fecha || '');
+                });
+
+                renderizarTabla(datosGlobales);
+                actualizarTarjetas(datosGlobales);
+
+            } catch (err) {
+                console.error("Error al cargar el reporte:", err);
+            }
+        }
+
+        function renderizarTabla(registros) {
+            const tbody = document.getElementById('tablaReporteBody');
+            tbody.innerHTML = '';
+
+            if (registros.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #7f8c8d;">No hay registros activos en este momento.</td></tr>`;
+                return;
+            }
+
+            registros.forEach(item => {
+                const nombreGranja = limpiarNombreGranja(item.granja) || 'Desconocida';
+                const idMostrado = (item.id && item.id !== 0) ? item.id : 'N/A';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.fecha || ''}</td>
+                    <td><b>${idMostrado}</b></td>
+                    <td>${nombreGranja}</td>
+                    <td class="text-util">${item.cantidad_util.toLocaleString()}</td>
+                    <td class="text-bases">${item.bases_sucias.toLocaleString()}</td>
+                    <td class="text-recuperado">${item.huevo_recuperado.toLocaleString()}</td>
+                    <td class="text-lavar">${item.sucio_a_lavar.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function actualizarTarjetas(registros) {
+            let sumUtil = 0, sumBases = 0, sumLavar = 0, sumRecuperado = 0;
+
+            registros.forEach(item => {
+                sumUtil += item.cantidad_util;
+                sumBases += item.bases_sucias;
+                sumLavar += item.sucio_a_lavar;
+                sumRecuperado += item.huevo_recuperado;
+            });
+
+            document.getElementById('totalUtilCard').textContent = sumUtil.toLocaleString();
+            document.getElementById('totalBasesCard').textContent = sumBases.toLocaleString();
+            document.getElementById('totalLavarCard').textContent = sumLavar.toLocaleString();
+            document.getElementById('totalRecuperadoCard').textContent = sumRecuperado.toLocaleString();
+        }
+
+        function filtrarTabla() {
+            const textoBusqueda = document.getElementById('buscarGranja').value.toLowerCase();
+            const fechaFiltro = document.getElementById('filtrarFecha').value;
+
+            const filtrados = datosGlobales.filter(item => {
+                const nombreGranja = limpiarNombreGranja(item.granja).toLowerCase();
+                const idGranja = String(item.id || '').toLowerCase();
+                const fechaItem = item.fecha || '';
+
+                const coincideTexto = nombreGranja.includes(textoBusqueda) || idGranja.includes(textoBusqueda);
+                const coincideFecha = !fechaFiltro || fechaItem === fechaFiltro;
+
+                return coincideTexto && coincideFecha;
+            });
+
+            renderizarTabla(filtrados);
+            actualizarTarjetas(filtrados);
+        }
+
+        function exportarCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Fecha,ID,Granja,Revoltura Útil,Bases Sucias,Huevo Recuperado,Sucio a Lavar\n";
+            const rows = document.querySelectorAll("#tablaReporteBody tr");
+            rows.forEach(row => {
+                const cols = row.querySelectorAll("td");
+                if (cols.length === 7) {
+                    const dataRow = Array.from(cols).map(c => `"${c.innerText}"`).join(",");
+                    csvContent += dataRow + "\r\n";
+                }
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "reporte_inventario_granjas.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        cargarReporte();
+    </script>
+</body>
+</html>

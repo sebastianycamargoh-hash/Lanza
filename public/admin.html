@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte General y Administración</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { background-color: #f4f6f9; color: #333; padding: 20px; }
+        .container { max-width: 1250px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
+
+        .nav-links { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; }
+        .nav-links a { background: #34495e; color: white; padding: 8px 15px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .nav-links a:hover { background: #2c3e50; }
+
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; text-align: left; }
+        th, td { padding: 12px 10px; border-bottom: 1px solid #ddd; font-size: 13px; }
+        th { background-color: #2c3e50; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+
+        .btn-accion { padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; color: white; }
+        .btn-editar { background: #f39c12; margin-right: 5px; }
+        .btn-editar:hover { background: #d68910; }
+        .btn-eliminar { background: #e74c3c; }
+        .btn-eliminar:hover { background: #c0392b; }
+
+        .text-util { color: #27ae60; font-weight: bold; }
+        .text-bases { color: #d35400; font-weight: bold; }
+        .text-siniestros { color: #c0392b; font-weight: bold; }
+        .text-recuperado { color: #2980b9; font-weight: bold; }
+        .text-lavar { color: #8e44ad; font-weight: bold; }
+
+        /* Estilos del Modal */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 8px; width: 100%; max-width: 450px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .modal-content h3 { margin-bottom: 15px; color: #2c3e50; text-align: center; }
+        .form-group { margin-bottom: 15px; display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 5px; font-size: 13px; font-weight: bold; }
+        .form-group input { padding: 9px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-guardar { background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; }
+        .btn-guardar:hover { background: #219653; }
+        .btn-cancelar { background: #95a5a6; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; }
+        .btn-cancelar:hover { background: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="nav-links">
+            <a href="index.html">Control de Inventario</a>
+            <a href="reporte.html">Reporte General</a>
+        </div>
+
+        <h1>Panel de Administración 📋</h1>
+        
+        <div class="table-responsive">
+            <table id="tablaReporteAdmin">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>ID</th>
+                        <th>Granja</th>
+                        <th>Revoltura Útil</th>
+                        <th>Bases Sucias</th>
+                        <th>Siniestros</th>
+                        <th>Huevo Recuperado</th>
+                        <th>Sucio a Lavar</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Los datos se cargan dinámicamente -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal de Edición -->
+    <div id="modalEditar" class="modal">
+        <div class="modal-content">
+            <h3>Editar Registro</h3>
+            <form id="formEditar">
+                <input type="hidden" id="editId">
+                <input type="hidden" id="editGranjaOriginal">
+                <input type="hidden" id="editFechaOriginal">
+                <div class="form-group">
+                    <label for="editFecha">Fecha:</label>
+                    <input type="date" id="editFecha" required>
+                </div>
+                <div class="form-group">
+                    <label for="editGranja">Granja:</label>
+                    <input type="text" id="editGranja" readonly style="background: #e9ecef;">
+                </div>
+                <div class="form-group">
+                    <label for="editUtil">Revoltura Útil:</label>
+                    <input type="number" id="editUtil" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="editBases">Bases Sucias:</label>
+                    <input type="number" id="editBases" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="editSiniestros">Siniestros:</label>
+                    <input type="number" id="editSiniestros" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="editRecuperado">Huevo Recuperado:</label>
+                    <input type="number" id="editRecuperado" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="editLavar">Sucio a Lavar:</label>
+                    <input type="number" id="editLavar" min="0" required>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-guardar">Guardar Cambios</button>
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const granjasIdMap = {
+            'borinquen': 20, 'caguan': 21, 'conquista': 24, 'guatavita': 30, 'laguna': 38,
+            'lomas': 39, 'muisca': 42, 'praga': 44, 'san diego': 46, 'san felipe': 47,
+            'santa isabel': 50, 'santa maria': 51, 'santa sofia': 52, 'tres esquinas': 54,
+            'paraiso': 59, 'canelos': 66, 'pradera': 1220, 'villa luz la laja': 1221,
+            'garvanzal': 1224, 'progreso': 1264, 'caracoli': 1281, 'sauce': 1289,
+            'san francisco': 1290, 'fortaleza': 1291, 'san rafael': 1306, 'buena vista': 1312,
+            'pedrera': 1313, 'primavera 2': 1324, 'delicias 2': 1326, 'aire libre': 1327,
+            'esperanza': 1331, 'villa inés': 1336, 'esmeralda': 1352, 'milagrosa': 1356,
+            'diviso': 1367, 'morelia': 1377, 'fortuna': 1379, 'prado': 1380, 'pomarroso': 1387,
+            'morro': 1391, 'victoria': 1398, 'olivos': 1399, 'llano de palma': 1401,
+            'andalucia': 1408, 'san gabriel': 1409, 'roble': 1421, 'caimito': 1438,
+            'san fernando': 1440, 'prosperidad': 1443, 'perpetua': 1445, 'marías': 1446,
+            'san carlos': 1448
+        };
+
+        function limpiarNombreGranja(nombre) {
+            if (!nombre) return '';
+            let limpio = nombre.includes(' - ') ? nombre.split(' - ')[1].trim() : nombre.trim();
+            limpio = limpio.replace(/\s+MOD\s*\d+/i, '').trim();
+            return limpio;
+        }
+
+        function obtenerIdGranja(nombreGranja, idOriginal) {
+            const nombreLimpio = limpiarNombreGranja(nombreGranja).toLowerCase();
+            if (granjasIdMap[nombreLimpio]) {
+                return granjasIdMap[nombreLimpio];
+            }
+            if (idOriginal && idOriginal !== 0 && idOriginal !== 108) {
+                return Number(idOriginal);
+            }
+            return idOriginal || 'N/A';
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            cargarReporteAdmin();
+        });
+
+        async function cargarReporteAdmin() {
+            try {
+                const [resIngresos, resLavar, resRecuperados] = await Promise.all([
+                    fetch('/api/ingresos'),
+                    fetch('/api/huevos-a-lavar'),
+                    fetch('/api/huevos-recuperados')
+                ]);
+
+                const dataIngresos = await resIngresos.json();
+                const dataLavar = await resLavar.json();
+                const dataRecuperados = await resRecuperados.json();
+
+                const tbody = document.querySelector("#tablaReporteAdmin tbody");
+                tbody.innerHTML = '';
+
+                const mapaRegistros = {};
+
+                if (Array.isArray(dataIngresos)) {
+                    dataIngresos.forEach(reg => {
+                        const nombreLimpio = limpiarNombreGranja(reg.granja);
+                        const idGranja = obtenerIdGranja(reg.granja, reg.id);
+                        const clave = `${reg.fecha}_${nombreLimpio.toLowerCase()}`;
+                        
+                        if (mapaRegistros[clave]) {
+                            mapaRegistros[clave].cantidad_util += Number(reg.cantidad_util) || 0;
+                            mapaRegistros[clave].bases_sucias += Number(reg.bases_sucias) || 0;
+                            mapaRegistros[clave].siniestros += Number(reg.siniestros) || 0;
+                            if (!mapaRegistros[clave].idGranjaCalculado || mapaRegistros[clave].idGranjaCalculado === 'N/A' || mapaRegistros[clave].idGranjaCalculado === 108) {
+                                mapaRegistros[clave].idGranjaCalculado = idGranja;
+                            }
+                        } else {
+                            mapaRegistros[clave] = {
+                                id: reg.id,
+                                fecha: reg.fecha,
+                                granja: reg.granja,
+                                idGranjaCalculado: idGranja,
+                                cantidad_util: Number(reg.cantidad_util) || 0,
+                                bases_sucias: Number(reg.bases_sucias) || 0,
+                                siniestros: Number(reg.siniestros) || 0,
+                                huevo_recuperado: 0,
+                                sucio_a_lavar: 0
+                            };
+                        }
+                    });
+                }
+
+                if (Array.isArray(dataLavar)) {
+                    dataLavar.forEach(rec => {
+                        const nombreLimpio = limpiarNombreGranja(rec.granja);
+                        const idGranja = obtenerIdGranja(rec.granja, rec.id);
+                        const clave = `${rec.fecha}_${nombreLimpio.toLowerCase()}`;
+                        const valorLavar = Number(rec.cantidad_lavada || 0);
+
+                        if (mapaRegistros[clave]) {
+                            mapaRegistros[clave].sucio_a_lavar += valorLavar;
+                            if (!mapaRegistros[clave].idGranjaCalculado || mapaRegistros[clave].idGranjaCalculado === 'N/A' || mapaRegistros[clave].idGranjaCalculado === 108) {
+                                mapaRegistros[clave].idGranjaCalculado = idGranja;
+                            }
+                        } else {
+                            mapaRegistros[clave] = {
+                                id: rec.id,
+                                fecha: rec.fecha,
+                                granja: rec.granja,
+                                idGranjaCalculado: idGranja,
+                                cantidad_util: 0,
+                                bases_sucias: 0,
+                                siniestros: 0,
+                                huevo_recuperado: 0,
+                                sucio_a_lavar: valorLavar
+                            };
+                        }
+                    });
+                }
+
+                if (Array.isArray(dataRecuperados)) {
+                    dataRecuperados.forEach(rec => {
+                        const nombreLimpio = limpiarNombreGranja(rec.granja);
+                        const idGranja = obtenerIdGranja(rec.granja, rec.id);
+                        const clave = `${rec.fecha}_${nombreLimpio.toLowerCase()}`;
+                        const valorRecup = Number(rec.cantidad_recuperada || rec.cantidad || 0);
+
+                        if (mapaRegistros[clave]) {
+                            mapaRegistros[clave].huevo_recuperado += valorRecup;
+                            if (!mapaRegistros[clave].idGranjaCalculado || mapaRegistros[clave].idGranjaCalculado === 'N/A' || mapaRegistros[clave].idGranjaCalculado === 108) {
+                                mapaRegistros[clave].idGranjaCalculado = idGranja;
+                            }
+                        } else {
+                            mapaRegistros[clave] = {
+                                id: rec.id,
+                                fecha: rec.fecha,
+                                granja: rec.granja,
+                                idGranjaCalculado: idGranja,
+                                cantidad_util: 0,
+                                bases_sucias: 0,
+                                siniestros: 0,
+                                huevo_recuperado: valorRecup,
+                                sucio_a_lavar: 0
+                            };
+                        }
+                    });
+                }
+
+                const listaFinal = Object.values(mapaRegistros).filter(item => {
+                    return !(item.cantidad_util <= 0.05 && item.bases_sucias <= 0.05 && item.siniestros <= 0.05 && item.huevo_recuperado <= 0.05 && item.sucio_a_lavar <= 0.05);
+                });
+
+                if (listaFinal.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: #777;">No hay registros disponibles.</td></tr>`;
+                    return;
+                }
+
+                listaFinal.sort((a, b) => {
+                    const idA = !isNaN(Number(a.idGranjaCalculado)) ? Number(a.idGranjaCalculado) : 999999;
+                    const idB = !isNaN(Number(b.idGranjaCalculado)) ? Number(b.idGranjaCalculado) : 999999;
+                    
+                    if (idA !== idB) {
+                        return idA - idB;
+                    }
+                    return (a.fecha || '').localeCompare(b.fecha || '');
+                });
+
+                listaFinal.forEach((reg) => {
+                    const nombreGranja = limpiarNombreGranja(reg.granja) || 'Desconocida';
+                    const idMostrado = (reg.idGranjaCalculado && reg.idGranjaCalculado !== 'N/A') ? reg.idGranjaCalculado : obtenerIdGranja(nombreGranja, '-');
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${reg.fecha || ''}</td>
+                        <td><b>${idMostrado}</b></td>
+                        <td>${nombreGranja}</td>
+                        <td><span class="text-util">${reg.cantidad_util.toLocaleString()}</span></td>
+                        <td><span class="text-bases">${reg.bases_sucias.toLocaleString()}</span></td>
+                        <td><span class="text-siniestros">${reg.siniestros.toLocaleString()}</span></td>
+                        <td><span class="text-recuperado">${reg.huevo_recuperado.toLocaleString()}</span></td>
+                        <td><span class="text-lavar">${reg.sucio_a_lavar.toLocaleString()}</span></td>
+                        <td>
+                            <button class="btn-accion btn-editar" onclick='abrirModal(${JSON.stringify(reg)})'>Editar</button>
+                            <button class="btn-accion btn-eliminar" onclick="eliminarRegistro('${reg.fecha}', '${reg.granja}')">Eliminar</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error("Error al cargar el reporte admin:", err);
+            }
+        }
+
+        function abrirModal(reg) {
+            document.getElementById('editId').value = reg.id || '';
+            document.getElementById('editFecha').value = reg.fecha || '';
+            document.getElementById('editFechaOriginal').value = reg.fecha || '';
+            document.getElementById('editGranja').value = reg.granja || '';
+            document.getElementById('editGranjaOriginal').value = reg.granja || '';
+            document.getElementById('editUtil').value = reg.cantidad_util || 0;
+            document.getElementById('editBases').value = reg.bases_sucias || 0;
+            document.getElementById('editSiniestros').value = reg.siniestros || 0;
+            document.getElementById('editRecuperado').value = reg.huevo_recuperado || 0;
+            document.getElementById('editLavar').value = reg.sucio_a_lavar || 0;
+
+            document.getElementById('modalEditar').style.display = 'flex';
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalEditar').style.display = 'none';
+        }
+
+        async function eliminarRegistro(fecha, granja) {
+            if (!confirm(`¿Estás seguro de eliminar el registro de la granja ${granja} en la fecha ${fecha}?`)) return;
+
+            try {
+                const res = await fetch(`/api/ingresos?fecha=${fecha}&granja=${encodeURIComponent(granja)}`, {
+                    method: 'DELETE'
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    alert('¡Registro eliminado con éxito!');
+                    cargarReporteAdmin();
+                } else {
+                    alert('Error al eliminar: ' + (data.error || 'No se pudo completar.'));
+                }
+            } catch (err) {
+                console.error("Error de conexión:", err);
+                alert("Error de conexión con el servidor.");
+            }
+        }
+
+        document.getElementById('formEditar').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const id = document.getElementById('editId').value;
+            const fecha = document.getElementById('editFecha').value;
+            const fechaOriginal = document.getElementById('editFechaOriginal').value;
+            const granja = document.getElementById('editGranja').value;
+            const cantidadUtil = parseInt(document.getElementById('editUtil').value) || 0;
+            const basesSucias = parseInt(document.getElementById('editBases').value) || 0;
+            const siniestros = parseInt(document.getElementById('editSiniestros').value) || 0;
+            const huevoRecuperado = parseInt(document.getElementById('editRecuperado').value) || 0;
+            const sucioALavar = parseInt(document.getElementById('editLavar').value) || 0;
+
+            try {
+                const res = await fetch('/api/ingresos', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id,
+                        fecha,
+                        fechaOriginal,
+                        granja,
+                        cantidadUtil,
+                        basesSucias,
+                        siniestros,
+                        huevoRecuperado,
+                        sucioALavar
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    alert('¡Registro actualizado correctamente!');
+                    cerrarModal();
+                    cargarReporteAdmin();
+                } else {
+                    alert('Error al actualizar: ' + (data.error || 'No se pudo completar.'));
+                }
+            } catch (err) {
+                console.error("Error al actualizar:", err);
+                alert("Error de conexión con el servidor.");
+            }
+        });
+    </script>
+</body>
+</html>
